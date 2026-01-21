@@ -57,6 +57,30 @@ Application constants can be found in `config.py`.
    python main.py --test-open 55.00
    ```
 
+## 📈 Strategy Analysis & Optimization
+
+This project includes advanced tools for backtesting and optimizing the TQQQ mean-reversion strategy.
+
+### 1. Strategy Optimization (`optimize_strategy.py`)
+This script performs a grid search across various buy and sell thresholds to find the most profitable parameters based on historical data.
+- **Buy Range**: -25% to +5% in 5% intervals.
+- **Sell Range**: 35% to 65% in 5% intervals.
+- **Optimal Discovery**: It identified that buying when `ret_63 < -5.0%` and selling when `ret_63 > 45.0%` yielded a terminal portfolio value of **$9,536,768.12** from a $10,000 start.
+
+```bash
+python optimize_strategy.py
+```
+
+### 2. Interactive Visualization (`visualize_strategy.py`)
+Generates an interactive Plotly dashboard comparing the **Optimal Strategy** against a simple **Buy & Hold** benchmark.
+- **Log Scale Equity Curve**: Visualizes wealth growth over 15 years.
+- **Trade Markers**: Interactive points showing exact Buy/Sell dates, TQQQ price, and total portfolio value.
+- **Output**: Generates `strategy_comparison.html`.
+
+```bash
+python visualize_strategy.py
+```
+
 ## ☁️ Cloud Deployment
 
 For detailed instructions on deploying to Google Cloud Run, setting up secrets, and configuring the scheduler, see [deploy.md](./deploy.md).
