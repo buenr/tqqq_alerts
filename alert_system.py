@@ -14,6 +14,8 @@ import matplotlib.dates as mdates
 import io
 import base64
 import config
+import requests
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -57,17 +59,42 @@ def fetch_data(ticker_symbol=config.TICKER_SYMBOL, period="2y"):
     """
     Fetches historical data for the given ticker.
     Fetches 2 years of data for dashboard visualizations.
+    Uses retry logic to handle rate limits.
     """
     logging.info(f"Fetching data for {ticker_symbol}...")
-    try:
-        data = yf.download(ticker_symbol, period=period, interval="1d", progress=False)
-        if data.empty:
-            logging.error(f"No data found for {ticker_symbol}.")
-            return None
-        return data
-    except Exception as e:
-        logging.error(f"Error fetching data: {e}")
-        return None
+    
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            # yfinance now uses curl_cffi internally to handle Yahoo's TLS fingerprinting.
+            # Providing a standard requests session can cause failures.
+            data = yf.download(
+                ticker_symbol, 
+                period=period, 
+                interval="1d", 
+                progress=False
+            )
+            
+            if data is not None and not data.empty:
+                return data
+            
+            logging.warning(f"Attempt {attempt + 1}: No data found for {ticker_symbol}. Retrying...")
+            
+        except Exception as e:
+            logging.error(f"Attempt {attempt + 1}: Error fetching data: {e}")
+            if "Rate limited" in str(e) or "Too Many Requests" in str(e):
+                logging.warning(f"Rate limit detected. Waiting {retry_delay}s before retry...")
+            
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
+
+    logging.error(f"Failed to fetch data for {ticker_symbol} after {max_retries} attempts.")
+    return None
+
+
 
 def get_close_prices(data):
     """Extract close prices from dataframe, handling MultiIndex columns."""
@@ -204,7 +231,16 @@ def generate_chart(dates, values, title, color, y_label, reference_lines=None):
         if reference_lines:
             for y_val, line_color, label in reference_lines:
                 ax.axhline(y=y_val, color=line_color, linestyle='--', linewidth=1, alpha=0.7)
-        
+
+        # Dynamic y-axis: fit to data range with padding instead of including 0
+        y_min, y_max = min(values), max(values)
+        if reference_lines:
+            ref_vals = [y_val for y_val, _, _ in reference_lines]
+            y_min = min(y_min, *ref_vals)
+            y_max = max(y_max, *ref_vals)
+        y_padding = (y_max - y_min) * 0.1 if y_max != y_min else 1
+        ax.set_ylim(y_min - y_padding, y_max + y_padding)
+
         # Formatting
         ax.set_title(title, fontsize=12, fontweight='600', color='#212529', pad=10)
         ax.set_ylabel(y_label, fontsize=9, color='#6c757d')

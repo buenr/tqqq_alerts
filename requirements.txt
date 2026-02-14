@@ -6,3 +6,6 @@ pandas_market_calendars
 flask
 gunicorn
 matplotlib
+plotly
+requests
+curl_cffi
